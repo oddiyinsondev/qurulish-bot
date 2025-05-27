@@ -26,14 +26,13 @@ menyu = ReplyKeyboardMarkup(
 )
 
 
-# === CONFIG ===
 
 
-# === DB SETUP ===
+
+
 conn = sqlite3.connect("referral.db")
 cursor = conn.cursor()
 
-# Yangi jadvalni yaratish
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
@@ -203,9 +202,6 @@ async def show_stats(message: Message):
     ws = wb.active
     ws.append(["User ID", "Username", "First Name", "Phone", "Referrals", "Subscribed"])
 
-
-
-
     # Foydalanuvchilarni va referallarga oid statistikani qo'shish
     cursor.execute("SELECT user_id, username, first_name, phone, referrals, is_subscribed FROM users")
     for row in cursor.fetchall():
@@ -214,10 +210,15 @@ async def show_stats(message: Message):
     # Faylni diskka saqlash
     wb.save("statistika.xlsx")
     document = FSInputFile("statistika.xlsx")
+
     # Foydalanuvchiga ma'lumot yuborish
     await message.answer("Statistika fayli yaratildi va saqlandi.")
-    await message.answer_document(document=document, caption="siz so'ragan fayl")
+    caption = f"Siz so‘ragan fayl\n👥 Umumiy foydalanuvchilar: {total_users}"
+    await message.answer_document(document=document, caption=caption)
+
+
     os.remove("statistika.xlsx")
+
 
 
 if __name__ == '__main__':

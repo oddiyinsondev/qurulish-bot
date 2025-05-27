@@ -1,4 +1,4 @@
-BOT_TOKEN = "#####"
-CHANNEL_ID = "chanel id"
-CHANNEL_URLS = "chanel link"
+BOT_TOKEN = "bot token"
+CHANNEL_ID = "kanal id"
+CHANNEL_URLS = "kanal link"
 admin = ["admin id"]
