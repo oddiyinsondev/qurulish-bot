@@ -183,11 +183,13 @@ async def show_top_referrals(message: Message):
 
 
 
-@dp.message(F.text == "/statistika", F.from_user.id.in_(admin))
+
+@dp.message(F.text == "/obunachilar", F.from_user.id.in_(admin))
 async def show_stats(message: Message):
     if message.from_user.id not in admin:
         return await message.answer("Kechirasiz, bu buyruq faqat adminlar uchun.")
 
+    # Statistika olish
     cursor.execute("SELECT COUNT(*) FROM users")
     total_users = cursor.fetchone()[0]
 
@@ -197,29 +199,77 @@ async def show_stats(message: Message):
     cursor.execute("SELECT referred_by, COUNT(*) FROM users WHERE is_subscribed = 1 AND referred_by IS NOT NULL GROUP BY referred_by")
     ref_stats = cursor.fetchall()
 
-    # Excel faylini yaratish
+    # Excel fayl yaratish
     wb = openpyxl.Workbook()
     ws = wb.active
+    ws.title = "Foydalanuvchilar"
     ws.append(["User ID", "Username", "First Name", "Phone", "Referrals", "Subscribed"])
 
-    # Foydalanuvchilarni va referallarga oid statistikani qo'shish
     cursor.execute("SELECT user_id, username, first_name, phone, referrals, is_subscribed FROM users")
     for row in cursor.fetchall():
         ws.append(row)
 
-    # Faylni diskka saqlash
-    wb.save("statistika.xlsx")
-    document = FSInputFile("statistika.xlsx")
+    filename = "statistika.xlsx"
+    wb.save(filename)
+    document = FSInputFile(filename)
 
-    # Foydalanuvchiga ma'lumot yuborish
-    await message.answer("Statistika fayli yaratildi va saqlandi.")
-    caption = f"Siz so‘ragan fayl\n👥 Umumiy foydalanuvchilar: {total_users}"
-    await message.answer_document(document=document, caption=caption)
+    # Statistika xabari
+    text = (
+        "<b>📊 Statistika</b>\n"
+        f"👥 Botdan foydalanuvchilar: <b>{total_users}</b>\n"
+        f"📢 Kanalga obuna bo‘lganlar: <b>{subscribed_users}</b>"
+    )
+    await message.answer(text)
+    await message.answer_document(document=document, caption="📎 Excel fayl")
 
+    os.remove(filename)
 
-    os.remove("statistika.xlsx")
+class ReklamaState(StatesGroup):
+    waiting_for_post = State()
 
+    
+@dp.message(F.text == "/reklama", F.from_user.id.in_(admin))
+async def start_reklama(message: Message, state: FSMContext):
+    await message.answer("✉️ Iltimos, reklama postini yuboring.")
+    await state.set_state(ReklamaState.waiting_for_post)
 
+@dp.message(ReklamaState.waiting_for_post, F.from_user.id.in_(admin))
+async def handle_full_post(message: Message, state: FSMContext):
+    await state.clear()
+
+    # Progressni ko‘rsatish
+    progress_msg = await message.answer("🚀 Reklama yuborilmoqda, iltimos kuting...")
+
+    # HAMMA foydalanuvchilar (obuna bo‘lmaganlar ham)
+    cursor.execute("SELECT user_id FROM users")
+    users = [row[0] for row in cursor.fetchall()]
+
+    success = 0
+    fail = 0
+
+    for user_id in users:
+        # Adminlarga yubormaymiz
+        if user_id in admin or user_id == message.from_user.id:
+            continue
+
+        try:
+            await bot.copy_message(chat_id=user_id,
+                                   from_chat_id=message.chat.id,
+                                   message_id=message.message_id)
+            success += 1
+        except Exception:
+            fail += 1
+
+    # Yuborilmoqda xabarini o‘chirish
+    await bot.delete_message(chat_id=message.chat.id, message_id=progress_msg.message_id)
+
+    # Natija
+    await message.answer(
+        f"✅ Sizning postingiz *barcha foydalanuvchilarga* tarqatildi!\n"
+        f"Yuborildi: {success} ta\n"
+        f"Yuborilmadi: {fail} ta",
+        parse_mode="Markdown"
+    )
 
 if __name__ == '__main__':
     try:
